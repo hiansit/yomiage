@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yomiage - Reading Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container glass-panel">
+        <header>
+            <h1 class="logo-title">Yomiage</h1>
+            <p class="subtitle">モダン＆リレー再生対応 テキスト読み上げツール</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="voice-select">音声/言語選択</label>
+                    <div class="select-wrapper">
+                        <select id="voice-select">
+                            <option value="">音声を読み込んでいます...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="sliders-container">
+                    <div class="control-group slider-group">
+                        <label for="volume-slider">音量: <span id="volume-val">100</span></label>
+                        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
+                    </div>
+                    <div class="control-group slider-group">
+                        <label for="rate-slider">再生速度: <span id="rate-val">1.0</span>x</label>
+                        <input type="range" id="rate-slider" min="0.5" max="4.0" step="0.25" value="1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-area-container">
+                <div class="status-bar">
+                    <span id="status-text" class="status-idle">待機中</span>
+                    <span id="progress-text">0 / 0</span>
+                </div>
+                <textarea id="text-input" placeholder="ここに読み上げたい長文を入力してください...&#10;（句点や改行で自動的に区切って連続再生します）"></textarea>
+            </div>
+
+            <div class="action-buttons">
+                <button id="play-btn" class="primary-btn glass-btn">
+                    <span class="icon">▶</span> 再生
+                </button>
+                <button id="pause-btn" class="secondary-btn glass-btn">
+                    <span class="icon">⏸</span> 一時停止
+                </button>
+                <button id="stop-btn" class="danger-btn glass-btn">
+                    <span class="icon">■</span> 停止
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
