@@ -4,12 +4,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const playBtn = document.getElementById('play-btn');
     const pauseBtn = document.getElementById('pause-btn');
     const stopBtn = document.getElementById('stop-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
     
     // Sliders
     const volumeSlider = document.getElementById('volume-slider');
     const rateSlider = document.getElementById('rate-slider');
     const volumeVal = document.getElementById('volume-val');
     const rateVal = document.getElementById('rate-val');
+
+    // 一時停止ボタンのラベル要素
+    const pauseIcon = document.getElementById('pause-icon');
+    const pauseLabel = document.getElementById('pause-label');
 
     volumeSlider.addEventListener('input', () => {
         volumeVal.textContent = Math.round(volumeSlider.value * 100);
@@ -30,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let textChunks = []; // Array of {text, start, end}
     let currentChunkIndex = 0;
     let isUserStopped = false;
+    let isPaused = false;
 
     // UIステータスの更新関数
     function updateStatus(status, index = 0, total = 0) {
@@ -37,13 +44,31 @@ document.addEventListener('DOMContentLoaded', () => {
             statusText.textContent = '再生中';
             statusText.className = 'status-playing';
             progressText.textContent = `${index} / ${total}`;
+            // 一時停止ボタンのラベルを「一時停止」に
+            pauseIcon.textContent = '⏸';
+            pauseLabel.textContent = '一時停止';
         } else if (status === 'paused') {
             statusText.textContent = '一時停止中';
             statusText.className = 'status-paused';
+            // 一時停止ボタンのラベルを「再開」に
+            pauseIcon.textContent = '▶';
+            pauseLabel.textContent = '再開';
         } else {
             statusText.textContent = '待機中';
             statusText.className = 'status-idle';
             progressText.textContent = `0 / 0`;
+            // 一時停止ボタンのラベルをリセット
+            pauseIcon.textContent = '⏸';
+            pauseLabel.textContent = '一時停止';
+        }
+    }
+
+    // ハイライトを更新する関数
+    function highlightChunk(index) {
+        if (index >= 0 && index < textChunks.length) {
+            const chunk = textChunks[index];
+            textInput.focus();
+            textInput.setSelectionRange(chunk.start, chunk.end);
         }
     }
 
@@ -118,10 +143,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // チャンクのリレー再生
     function playCurrentChunk() {
         if (currentChunkIndex >= textChunks.length || isUserStopped) {
-            updateStatus('idle');
+            if (!isUserStopped) {
+                // 全チャンク再生完了
+                updateStatus('idle');
+            }
             return;
         }
 
+        isPaused = false;
         updateStatus('playing', currentChunkIndex + 1, textChunks.length);
         const chunk = textChunks[currentChunkIndex];
         const utterance = new SpeechSynthesisUtterance(chunk.text);
@@ -137,23 +166,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         utterance.onend = () => {
-            if (isUserStopped) return;
+            if (isUserStopped || isPaused) return;
             currentChunkIndex++;
             playCurrentChunk();
         };
 
         utterance.onerror = (e) => {
             console.warn('SpeechSynthesis Error: ', e);
-            // キャンセルされたなどの場合はリレーを止める
-            if (e.error !== 'interrupted' && e.error !== 'canceled' && !isUserStopped) {
+            // キャンセルされた場合はリレーを止める（一時停止やスキップ操作による正常なキャンセル）
+            if (e.error !== 'interrupted' && e.error !== 'canceled' && !isUserStopped && !isPaused) {
                 currentChunkIndex++;
                 playCurrentChunk();
             }
         };
 
         // ハイライトの表示
-        textInput.focus();
-        textInput.setSelectionRange(chunk.start, chunk.end);
+        highlightChunk(currentChunkIndex);
 
         synth.speak(utterance);
     }
@@ -168,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 既に再生中の場合はキャンセルして最初から
         isUserStopped = true;
+        isPaused = false;
         synth.cancel();
 
         // 少し時間をおいてから再スタート (キャンセル処理が非同期に波及する場合の安全策)
@@ -180,20 +209,62 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 一時停止・再開処理
+    // Chromium系ブラウザでは synth.pause()/resume() が不安定なため、
+    // cancel() で停止し、同じチャンクから再生し直す方式を採用
     pauseBtn.addEventListener('click', () => {
-        if (synth.speaking && !synth.paused) {
-            synth.pause();
-            updateStatus('paused');
-        } else if (synth.paused) {
-            synth.resume();
-            updateStatus('playing', currentChunkIndex + 1, textChunks.length);
+        if (!isPaused && (synth.speaking || synth.pending)) {
+            // 一時停止する
+            isPaused = true;
+            synth.cancel();
+            updateStatus('paused', currentChunkIndex + 1, textChunks.length);
+        } else if (isPaused && textChunks.length > 0) {
+            // 再開する（同じチャンクから再生）
+            isPaused = false;
+            isUserStopped = false;
+            playCurrentChunk();
         }
     });
 
     // 停止処理
     stopBtn.addEventListener('click', () => {
         isUserStopped = true;
+        isPaused = false;
         synth.cancel();
         updateStatus('idle');
     });
+
+    // 前の文へスキップ
+    prevBtn.addEventListener('click', () => {
+        if (textChunks.length === 0) return;
+        
+        synth.cancel();
+        isPaused = false;
+        isUserStopped = false;
+        
+        if (currentChunkIndex > 0) {
+            currentChunkIndex--;
+        }
+        // 少し遅延を入れてから再生（cancel の非同期処理対策）
+        setTimeout(() => {
+            playCurrentChunk();
+        }, 50);
+    });
+
+    // 次の文へスキップ
+    nextBtn.addEventListener('click', () => {
+        if (textChunks.length === 0) return;
+        
+        synth.cancel();
+        isPaused = false;
+        isUserStopped = false;
+        
+        if (currentChunkIndex < textChunks.length - 1) {
+            currentChunkIndex++;
+        }
+        // 少し遅延を入れてから再生（cancel の非同期処理対策）
+        setTimeout(() => {
+            playCurrentChunk();
+        }, 50);
+    });
 });
+

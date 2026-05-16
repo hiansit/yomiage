@@ -281,3 +281,12 @@ textarea:focus {
     color: #0f2027;
     border: none;
 }
+
+.skip-buttons {
+    margin-top: 0.8rem;
+}
+
+.skip-btn {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.9rem;
+}
